@@ -1,0 +1,10 @@
+version: '3'
+services:
+  mongodb:
+    image: mongo:3.6.18
+    container_name: mongodb
+    volumes:
+      - ./data/db:/data/db
+    ports:
+        - 27017:27017
+    command: mongod
