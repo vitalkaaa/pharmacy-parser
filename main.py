@@ -1,6 +1,6 @@
 import json
 
-from parsers import russia as rus_parser
+from parsers import russian as rus_parser
 
 from mongoengine import *
 from models import *

@@ -46,13 +46,13 @@ def parse_medicine_ext_page(html_object, medicine: Medicine):
             html_o1 = item[2*i]
             html_o2 = item[2*i + 1]
 
-            entry['Форма выпуска'].append({
-                'Лекарственная форма': html_o1.xpath('./td')[0].text_content(),
-                'Дозировка': html_o1.xpath('./td')[1].text_content(),
-                'Срок годности': html_o1.xpath('./td')[2].text_content(),
-                'Условия хранения': html_o1.xpath('./td')[3].text_content(),
-                'Упавковки': [p.text_content() for p in html_o2.xpath('.//li')]
-            })
+            release_form = ReleaseForm()
+            release_form.dosage_form = html_o1.xpath('./td')[0].text_content()
+            release_form.dosage = html_o1.xpath('./td')[1].text_content()
+            release_form.expiration_date = html_o1.xpath('./td')[2].text_content()
+            release_form.storage_conditions = html_o1.xpath('./td')[3].text_content()
+            release_form.packing = [p.text_content() for p in html_o2.xpath('.//li')]
+            medicine.release_forms.append(release_form)
     except IndexError:
         print('ERROR: форма выпуска')
 
@@ -60,12 +60,12 @@ def parse_medicine_ext_page(html_object, medicine: Medicine):
     try:
         item = topics[5].xpath('.//tr[@class="hi_sys"]')
         for html_o in item:
-            entry['Сведения о стадиях производства'].append({
-                'Стадия производства': html_o.xpath('./td')[1].text_content(),
-                'Производитель': html_o.xpath('./td')[2].text_content(),
-                'Адрес производителя': html_o.xpath('./td')[3].text_content(),
-                'Страна': html_o.xpath('./td')[4].text_content(),
-            })
+            production_stage = ProductionStage()
+            production_stage.stage = html_o.xpath('./td')[1].text_content()
+            production_stage.producer = html_o.xpath('./td')[2].text_content()
+            production_stage.address = html_o.xpath('./td')[3].text_content()
+            production_stage.country = html_o.xpath('./td')[4].text_content()
+            medicine.production_stages.append(production_stage)
     except IndexError:
         print('ERROR: Сведения о стадиях производства')
 
@@ -73,23 +73,22 @@ def parse_medicine_ext_page(html_object, medicine: Medicine):
     try:
         item = topics[7].xpath('.//tr[@class="hi_sys"]')
         for html_o in item:
-            entry['Нормативная документация'].append({
-                'Номер НД': html_o.xpath('./td')[1].text_content(),
-                'Год': html_o.xpath('./td')[2].text_content(),
-                '№ изм': html_o.xpath('./td')[3].text_content(),
-                'Наименование': html_o.xpath('./td')[4].text_content(),
-            })
+            normative_document = NormativeDocument()
+            normative_document.number = html_o.xpath('./td')[1].text_content()
+            normative_document.date = datetime.strptime(html_o.xpath('./td')[2].text_content(), '%Y')
+            normative_document.change_number = html_o.xpath('./td')[3].text_content()
+            normative_document.name = html_o.xpath('./td')[4].text_content()
+            medicine.normative_documents.append(normative_document)
     except IndexError:
         print('ERROR: Нормативная документация')
 
     # Фармако-терапевтическая группа
     try:
-        item = topics[8].xpath('.//tr[@class="hi_sys"]/td')
-        entry['Нормативная документация'] = item[0].text_content()
+        medicine.pharmacotherapeutic_group = topics[8].xpath('.//tr[@class="hi_sys"]/td')[0].text_content()
     except IndexError:
         print('ERROR: Фармако-терапевтическая группа')
 
-    # Анатомо-терапевтическая химическая классификация
+    # TODO: Анатомо-терапевтическая химическая классификация
     try:
         item = topics[9].xpath('.//tr[@class="hi_sys"]/td')
         entry['Анатомо-терапевтическая химическая классификация'] = {
@@ -99,7 +98,7 @@ def parse_medicine_ext_page(html_object, medicine: Medicine):
     except IndexError:
         print('ERROR: Анатомо-терапевтическая химическая классификация')
 
-    # Фармацевтическая субстанция
+    # TODO: Фармацевтическая субстанция
     try:
         item = topics[10].xpath('.//tr[@class="hi_sys"]')
         for html_o in item:
