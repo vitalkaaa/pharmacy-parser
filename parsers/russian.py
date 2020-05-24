@@ -18,6 +18,7 @@ def parse_medicine_main_page(entry_html_object, medicine: Medicine):
     medicine.guid = entry_html_object.xpath('@onclick')[0][5:-5]
     medicine.trade_name = entry_as_list[1]
     medicine.mnn = MNN.objects(name_ru__in=[i.upper() for i in entry_as_list[2].split('+')])
+    medicine.mnn_orig = entry_as_list[2]
     medicine.release_forms_collapsed = entry_as_list[3]
     medicine.reg_owner = entry_as_list[4]
     medicine.reg_country = entry_as_list[5]
@@ -30,14 +31,8 @@ def parse_medicine_main_page(entry_html_object, medicine: Medicine):
     medicine.decision_date = datetime.strptime(entry_as_list[11], '%d.%m.%Y') if entry_as_list[6] == ' ' else None
 
 
-def parse_medicine_ext_page(html_object, medicine: Medicine):
+def parse_medicine_ext_page(html_object, medicine: Medicine, mnn: MNN):
     topics = html_object.xpath('//tr[@class="ter1"]')
-    entry = {
-        'Форма выпуска': [],
-        'Сведения о стадиях производства': [],
-        'Нормативная документация': [],
-        'Фармацевтическая субстанция': []
-    }
 
     # Формы выпуска
     try:
@@ -52,6 +47,7 @@ def parse_medicine_ext_page(html_object, medicine: Medicine):
             release_form.expiration_date = html_o1.xpath('./td')[2].text_content()
             release_form.storage_conditions = html_o1.xpath('./td')[3].text_content()
             release_form.packing = [p.text_content() for p in html_o2.xpath('.//li')]
+            medicine.release_forms = list()
             medicine.release_forms.append(release_form)
     except IndexError:
         print('ERROR: форма выпуска')
@@ -65,6 +61,7 @@ def parse_medicine_ext_page(html_object, medicine: Medicine):
             production_stage.producer = html_o.xpath('./td')[2].text_content()
             production_stage.address = html_o.xpath('./td')[3].text_content()
             production_stage.country = html_o.xpath('./td')[4].text_content()
+            medicine.production_stages = list()
             medicine.production_stages.append(production_stage)
     except IndexError:
         print('ERROR: Сведения о стадиях производства')
@@ -78,6 +75,7 @@ def parse_medicine_ext_page(html_object, medicine: Medicine):
             normative_document.date = datetime.strptime(html_o.xpath('./td')[2].text_content(), '%Y')
             normative_document.change_number = html_o.xpath('./td')[3].text_content()
             normative_document.name = html_o.xpath('./td')[4].text_content()
+            medicine.normative_documents = list()
             medicine.normative_documents.append(normative_document)
     except IndexError:
         print('ERROR: Нормативная документация')
@@ -91,10 +89,10 @@ def parse_medicine_ext_page(html_object, medicine: Medicine):
     # TODO: Анатомо-терапевтическая химическая классификация
     try:
         item = topics[9].xpath('.//tr[@class="hi_sys"]/td')
-        entry['Анатомо-терапевтическая химическая классификация'] = {
-            'Код АТХ': item[0].text_content(),
-            'АТХ': item[1].text_content(),
-        }
+        atc = ATCClassification()
+        atc.atc = item[1].text_content()
+        atc.code = item[0].text_content()
+        medicine.atc_classification = atc
     except IndexError:
         print('ERROR: Анатомо-терапевтическая химическая классификация')
 
@@ -102,20 +100,21 @@ def parse_medicine_ext_page(html_object, medicine: Medicine):
     try:
         item = topics[10].xpath('.//tr[@class="hi_sys"]')
         for html_o in item:
-            entry['Фармацевтическая субстанция'].append({
-                'Международное непатентованное/группировочное/химическое наименование': html_o.xpath('./td')[0].text_content(),
-                'Торговое наименование': html_o.xpath('./td')[1].text_content(),
-                'Производитель': html_o.xpath('./td')[2].text_content(),
-                'Адрес': html_o.xpath('./td')[3].text_content(),
-                'Срок годности': html_o.xpath('./td')[4].text_content(),
-                'Условия хранения': html_o.xpath('./td')[5].text_content(),
-                'Фармакоп. статья / Номер НД': html_o.xpath('./td')[6].text_content(),
-                'Нарк. прекурсор': html_o.xpath('./td')[7].text_content(),
-            })
+            substance = MedicineSubstanceEntry()
+            substance.mnn = mnn
+            substance.name_orig = html_o.xpath('./td')[1].text_content()
+            producer = Substance.objects(production_stages__match={'producer': html_o.xpath('./td')[2].text_content()}).first()
+            if producer:
+                substance.producer = producer
+            substance.address = html_o.xpath('./td')[3].text_content()
+            substance.expiration_date = html_o.xpath('./td')[4].text_content()
+            substance.storage_conditions = html_o.xpath('./td')[5].text_content()
+            substance.number = html_o.xpath('./td')[6].text_content()
+            substance.drug_status = html_o.xpath('./td')[7].text_content()
+            medicine.substances = list()
+            medicine.substances.append(substance)
     except IndexError:
         print('ERROR: Фармацевтическая субстанция')
-
-    return entry
 
 
 def parse_substance_main_page(entry_html_object, substance: Substance):
@@ -149,6 +148,7 @@ def parse_substance_ext_page(html_object, substance: Substance):
             release_form.expiration_date = html_o1.xpath('./td')[2].text_content()
             release_form.storage_conditions = html_o1.xpath('./td')[3].text_content()
             release_form.packing = [p.text_content() for p in html_o2.xpath('.//li')]
+            substance.release_forms = list()
             substance.release_forms.append(release_form)
     except IndexError:
         print('ERROR: форма выпуска')
@@ -162,6 +162,7 @@ def parse_substance_ext_page(html_object, substance: Substance):
             production_stage.producer = html_o.xpath('./td')[2].text_content()
             production_stage.address = html_o.xpath('./td')[3].text_content()
             production_stage.country = html_o.xpath('./td')[4].text_content()
+            substance.production_stages = list()
             substance.production_stages.append(production_stage)
     except IndexError:
         print('ERROR: Сведения о стадиях производства')
@@ -172,9 +173,11 @@ def parse_substance_ext_page(html_object, substance: Substance):
         for html_o in item:
             normative_document = NormativeDocument()
             normative_document.number = html_o.xpath('./td')[1].text_content()
-            normative_document.date = datetime.strptime(html_o.xpath('./td')[2].text_content(), '%Y')
+            if html_o.xpath('./td')[2].text_content() != u'\xa0':
+                normative_document.date = datetime.strptime(html_o.xpath('./td')[2].text_content(), '%Y')
             normative_document.change_number = html_o.xpath('./td')[3].text_content()
             normative_document.name = html_o.xpath('./td')[4].text_content()
+            substance.normative_documents = list()
             substance.normative_documents.append(normative_document)
     except IndexError:
         print('ERROR: Нормативная документация')
@@ -183,11 +186,11 @@ def parse_substance_ext_page(html_object, substance: Substance):
 def parse_medicine(mnn):
     page_count = 1
     for page_num in range(1, 100):
-        print(f'{mnn.name_ru} page {page_num} {MEDICINE_MAIN_PAGE_URL % (mnn, page_num)}')
+        print(f'{mnn.name_ru} {MEDICINE_MAIN_PAGE_URL % (mnn.name_ru, page_num)}')
         response = requests.get(MEDICINE_MAIN_PAGE_URL % (mnn.name_ru, page_num))
         html_main = html.fromstring(response.text)
 
-        for attempt in range(3):
+        for attempt in range(5):
             try:
                 if page_num == 1:
                     page_count = int(html_main.xpath('//span[@id="ctl00_plate_lrecn"]/text()')[0].split(': ')[-1]) // 10 + 1
@@ -196,10 +199,10 @@ def parse_medicine(mnn):
                     medicine = Medicine()
                     parse_medicine_main_page(entry_html_object, medicine)
 
-                    # response = requests.get(MEDICINE_EXT_PAGE_URL % main_entry_object['guid'])
-                    # html_ext = html.fromstring(response.text)
+                    response = requests.get(MEDICINE_EXT_PAGE_URL % medicine.guid)
+                    html_ext = html.fromstring(response.text)
 
-                    # parse_medicine_ext_page(html_ext, medicine)
+                    parse_medicine_ext_page(html_ext, medicine, mnn)
                     medicine.save()
 
             except IndexError:
@@ -214,11 +217,11 @@ def parse_medicine(mnn):
 def parse_substance(mnn):
     page_count = 1
     for page_num in range(1, 100):
-        print(f'Substance {mnn.name_ru}, page {page_num}')
+        print(f'Substance {mnn.name_ru}')
         response = requests.get(SUBSTANCE_MAIN_PAGE_URL % (mnn.name_ru, page_num))
         html_main = html.fromstring(response.text)
 
-        for attempt in range(3):
+        for attempt in range(5):
             try:
                 if page_num == 1:
                     page_count = int(html_main.xpath('//span[@id="ctl00_plate_lrecn"]/text()')[0].split(': ')[-1]) // 10 + 1

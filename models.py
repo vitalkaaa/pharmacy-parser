@@ -50,10 +50,21 @@ class Substance(Document):
     normative_documents = EmbeddedDocumentListField(NormativeDocument)  # "Нормативная документация"
 
 
+class MedicineSubstanceEntry(EmbeddedDocument):
+    mnn = ReferenceField(MNN)  # "Международное непатентованное наим. или группировочное наименование" en language
+    name = StringField()  # Торг. наименование
+    producer = ReferenceField(Substance)
+    address = StringField()  # Адрес
+    expiration_date = StringField()  # "Срок годности"
+    storage_conditions = StringField()  # "Условия хранения"
+    number = StringField()  # "Номер НД"
+    drug_status = StringField()  # "Входит в перечень нарк. средств, псих. веществ и их прекурсоров"
+
+
 class Medicine(Document):
     guid = StringField()  # site GUID
     mnn = ListField(ReferenceField(MNN))  # Список мнн ( А+B -> [A, B] ) en language
-    mnn_orig = ListField(StringField)  # Список мнн ( А+B -> [A, B] ) orig language
+    mnn_orig = StringField()  # Список мнн ( А+B -> [A, B] ) orig language
     trade_name = StringField()  # "Торговое наименование"
     reg_owner = StringField()  # "Наименование держателя или владельца рег. удостоверения лекарственного препарата"
     reg_country = StringField()  # "Страна держателя или владельца рег. удостоверения лекарственного препарата"
@@ -68,7 +79,8 @@ class Medicine(Document):
     release_forms = EmbeddedDocumentListField(ReleaseForm)  # "Форма выпуска"
     release_forms_collapsed = StringField()  # "Форма выпуска с главной"
     production_stages = EmbeddedDocumentListField(ProductionStage)  # "Сведения о стадиях производства"
-    substances = ListField(Substance)  # "Фармацевтическая субстанция"
+    substances = EmbeddedDocumentListField(MedicineSubstanceEntry)  # "Фармацевтическая субстанция"
+    atc_classification = EmbeddedDocumentField(ATCClassification)
 
 
 
